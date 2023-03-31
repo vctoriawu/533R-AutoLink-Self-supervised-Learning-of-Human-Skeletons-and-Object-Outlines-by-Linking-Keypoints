@@ -31,6 +31,7 @@ class ResBlock(nn.Module):
         self.relu = nn.LeakyReLU(0.2, True)
 
     def forward(self, x):
+        x = x.float()
         res = self.conv_res(x)
         x = self.net(x)
         return self.relu(x + res)
