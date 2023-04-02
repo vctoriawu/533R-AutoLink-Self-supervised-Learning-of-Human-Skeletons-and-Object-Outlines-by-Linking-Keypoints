@@ -31,7 +31,7 @@ def save_img_kp_skeleton(img, damaged_img, kp, heatmap, kp_color, folder_name, i
     plt.savefig(os.path.join('det', folder_name, str(index), 'kp.png'), dpi=128)
     plt.close(fig)
 
-    fig = plt.figure()
+    '''fig = plt.figure()
     fig.set_size_inches(1, 1, forward=False)
     fig.subplots_adjust(0, 0, 1, 1)
     fig.tight_layout(pad=0)
@@ -43,7 +43,7 @@ def save_img_kp_skeleton(img, damaged_img, kp, heatmap, kp_color, folder_name, i
     # draw skeleton
     heatmap_overlaid = torch.stack([heatmap] * 3, dim=2) / heatmap.max()
     heatmap_overlaid = torch.clamp(heatmap_overlaid + img * 0.5, min=0, max=1)
-    Image.fromarray(np.uint8(heatmap_overlaid * 255)).save(os.path.join('det', folder_name, str(index), 'structure.png'))
+    Image.fromarray(np.uint8(heatmap_overlaid * 255)).save(os.path.join('det', folder_name, str(index), 'structure.png'))'''
 
     print(index)
 
@@ -82,6 +82,8 @@ def draw_img_kp_skeleton(img, kp, heatmap, kp_color):
 
     plt.show()
 
+def return_keypoints():
+    print("made it")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -107,13 +109,26 @@ if __name__ == '__main__':
     kp_color = get_part_color(model.hparams.n_parts)
 
     datamodule = DataModule(model.hparams.dataset, args.data_root, model.hparams.image_size, batch_size=1).test_dataloader()[1]
+    print(len(datamodule))
 
     pl.utilities.seed.seed_everything(0)
+
+    # Sizes of original and center-cropped images
+    original_size = 224
+    crop_size = 128
+
+    # Offset between top-left corners of original and center-cropped images
+    crop_offset = (original_size - crop_size) // 2
 
     for batch_index, batch in enumerate(datamodule):
         encoded = model.encoder({'img': batch['img'].to(device)})
         decoded = model.decoder(encoded)
         scaled_kp = decoded['keypoints'][0].cpu() * model.hparams.image_size / 2 + model.hparams.image_size / 2
+        
+        # Compute coordinates in original image
+        point_original = scaled_kp + crop_offset
+        print(point_original)
+
         # draw_img_kp_skeleton(img=batch['img'].squeeze(0).permute(1, 2, 0).cpu() * 0.5 + 0.5,
         #                      kp=scaled_kp,
         #                      heatmap=decoded['heatmap'][0, 0].cpu(),
@@ -126,5 +141,5 @@ if __name__ == '__main__':
                              folder_name=args.folder_name,
                              index=batch_index)
 
-        if batch_index > 200:
+        if batch_index > 10:
             break
