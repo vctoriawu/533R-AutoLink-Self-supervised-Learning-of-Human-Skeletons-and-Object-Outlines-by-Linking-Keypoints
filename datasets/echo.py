@@ -23,11 +23,11 @@ class TrainSet(torch.utils.data.Dataset):
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ])
 
-        data_dir = os.path.join(data_root, "LV_cleaned")
+        data_dir = os.path.join(data_root, "LV_PLAX2_cleaned/Cleaned")
 
         mode = "train"
         # Read the data CSV file
-        self.data_info = pd.read_csv(os.path.join(data_root, "files/lv_plax2_cleaned_info_landmark_gt_filtered.csv"))
+        self.data_info = pd.read_csv(os.path.join(data_root, "lv_plax2_cleaned_info_landmark_gt_filtered.csv"))
 
         # Rename the index column so the processed data can be tracked down later
         self.data_info = self.data_info.rename(columns={'Unnamed: 0': 'db_indx'})
@@ -93,11 +93,11 @@ class TrainRegSet(torch.utils.data.Dataset):
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ])
 
-        data_dir = os.path.join(data_root, "LV_cleaned")
+        data_dir = os.path.join(data_root, "LV_PLAX2_cleaned/Cleaned")
         mode = "val"
 
         # Read the data CSV file
-        self.data_info = pd.read_csv(os.path.join(data_root, "files/lv_plax2_cleaned_info_landmark_gt_filtered.csv"))
+        self.data_info = pd.read_csv(os.path.join(data_root, "lv_plax2_cleaned_info_landmark_gt_filtered.csv"))
 
         # Rename the index column so the processed data can be tracked down later
         self.data_info = self.data_info.rename(columns={'Unnamed: 0': 'db_indx'})
@@ -163,11 +163,11 @@ class TestSet(torch.utils.data.Dataset):
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ])
 
-        data_dir = os.path.join(data_root, "LV_cleaned")
+        data_dir = os.path.join(data_root, "LV_PLAX2_cleaned/Cleaned")
 
         mode = "test"
         # Read the data CSV file
-        self.data_info = pd.read_csv(os.path.join(data_root, "files/lv_plax2_cleaned_info_landmark_gt_filtered.csv"))
+        self.data_info = pd.read_csv(os.path.join(data_root, "lv_plax2_cleaned_info_landmark_gt_filtered.csv"))
 
         # Rename the index column so the processed data can be tracked down later
         self.data_info = self.data_info.rename(columns={'Unnamed: 0': 'db_indx'})
@@ -182,6 +182,7 @@ class TestSet(torch.utils.data.Dataset):
         self.data_info['cleaned_path'] = self.data_info.apply(lambda row: os.path.join(data_dir, row['file_name']),
                                                               axis=1)
 
+        print(len(self.data_info))
         #self.imgs = torchvision.datasets.ImageFolder(root=data_root, transform=self.transform)
 
     def __getitem__(self, idx):
@@ -209,6 +210,8 @@ class TestSet(torch.utils.data.Dataset):
         new_image[1, :, :] = ed_frame
         new_image[2, :, :] = ed_frame
 
+        new_image2 = np.transpose(new_image, (1, 2, 0))
+
         transform = transforms.Compose([
             transforms.ToPILImage(),  # Convert NumPy array to PIL Image object
             #transforms.Resize((128, 128)),  # Resize the PIL Image object
@@ -216,9 +219,9 @@ class TestSet(torch.utils.data.Dataset):
             transforms.ToTensor()  # Convert PIL Image object to tensor
         ])
         
-        new_image = transform(np.transpose(new_image, (1, 2, 0)))
-
-        sample = {'img': np.transpose(new_image, (0, 1, 2)), 'keypoints': torch.tensor(0)}
+        new_image1 = transform(np.transpose(new_image, (1, 2, 0)))
+        
+        sample = {'img': np.transpose(new_image1, (0, 1, 2)), 'img2':np.transpose(new_image2, (2, 0, 1)), 'keypoints': torch.tensor(0)}
         return sample
 
     def __len__(self):

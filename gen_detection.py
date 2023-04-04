@@ -8,6 +8,7 @@ from PIL import Image
 
 from datasets.base_dataset import DataModule
 from visualization import *
+from torchvision import transforms
 
 torch.set_grad_enabled(False)
 device = 'cuda:0'
@@ -31,7 +32,7 @@ def save_img_kp_skeleton(img, damaged_img, kp, heatmap, kp_color, folder_name, i
     plt.savefig(os.path.join('det', folder_name, str(index), 'kp.png'), dpi=128)
     plt.close(fig)
 
-    fig = plt.figure()
+    '''fig = plt.figure()
     fig.set_size_inches(1, 1, forward=False)
     fig.subplots_adjust(0, 0, 1, 1)
     fig.tight_layout(pad=0)
@@ -43,7 +44,7 @@ def save_img_kp_skeleton(img, damaged_img, kp, heatmap, kp_color, folder_name, i
     # draw skeleton
     heatmap_overlaid = torch.stack([heatmap] * 3, dim=2) / heatmap.max()
     heatmap_overlaid = torch.clamp(heatmap_overlaid + img * 0.5, min=0, max=1)
-    Image.fromarray(np.uint8(heatmap_overlaid * 255)).save(os.path.join('det', folder_name, str(index), 'structure.png'))
+    Image.fromarray(np.uint8(heatmap_overlaid * 255)).save(os.path.join('det', folder_name, str(index), 'structure.png'))'''
 
     print(index)
 
@@ -82,6 +83,49 @@ def draw_img_kp_skeleton(img, kp, heatmap, kp_color):
 
     plt.show()
 
+def return_keypoints(ed_frame):
+    m = 'model'
+    l = 'echo_k8_m0.8_b8_t0.0025_sklr512.0'
+
+    model = importlib.import_module('models.' + m).Model.load_from_checkpoint(os.path.join('external/cpsc-AutoLink-Self-supervised-Learning-of-Human-Skeletons-and-Object-Outlines-by-Linking-Keypoints/checkpoints', l, 'model.ckpt'))
+    model = model.to(device)
+    model.eval()
+
+    model.decoder.thick = 5e-4  # for visualization only
+
+    # Create a new 3-channel image with the same size
+    new_image = np.zeros((3, 224, 224), dtype=np.uint8)
+
+    # Duplicate the grayscale channel into the other two channels
+    new_image[0, :, :] = ed_frame
+    new_image[1, :, :] = ed_frame
+    new_image[2, :, :] = ed_frame
+
+    transform = transforms.Compose([
+        transforms.ToPILImage(),  # Convert NumPy array to PIL Image object
+        #transforms.Resize((128, 128)),  # Resize the PIL Image object
+        transforms.CenterCrop(128),
+        transforms.ToTensor()  # Convert PIL Image object to tensor
+    ])
+    
+    new_image = transform(np.transpose(new_image, (1, 2, 0)))
+    new_image = new_image.unsqueeze(0)
+
+    encoded = model.encoder({'img':new_image.to(device)})
+    decoded = model.decoder(encoded)
+    scaled_kp = decoded['keypoints'][0].cpu() * model.hparams.image_size / 2 + model.hparams.image_size / 2
+    
+    # Sizes of original and center-cropped images
+    original_size = 224
+    crop_size = 128
+
+    # Offset between top-left corners of original and center-cropped images
+    crop_offset = (original_size - crop_size) // 2
+
+    # Compute coordinates in original image
+    point_original = scaled_kp + crop_offset
+
+    return point_original
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -107,13 +151,26 @@ if __name__ == '__main__':
     kp_color = get_part_color(model.hparams.n_parts)
 
     datamodule = DataModule(model.hparams.dataset, args.data_root, model.hparams.image_size, batch_size=1).test_dataloader()[1]
+    print(len(datamodule))
 
     pl.utilities.seed.seed_everything(0)
+
+    # Sizes of original and center-cropped images
+    original_size = 224
+    crop_size = 128
+
+    # Offset between top-left corners of original and center-cropped images
+    crop_offset = (original_size - crop_size) // 2
 
     for batch_index, batch in enumerate(datamodule):
         encoded = model.encoder({'img': batch['img'].to(device)})
         decoded = model.decoder(encoded)
         scaled_kp = decoded['keypoints'][0].cpu() * model.hparams.image_size / 2 + model.hparams.image_size / 2
+        
+        # Compute coordinates in original image
+        point_original = scaled_kp + crop_offset
+        print(point_original)
+
         # draw_img_kp_skeleton(img=batch['img'].squeeze(0).permute(1, 2, 0).cpu() * 0.5 + 0.5,
         #                      kp=scaled_kp,
         #                      heatmap=decoded['heatmap'][0, 0].cpu(),
@@ -126,5 +183,5 @@ if __name__ == '__main__':
                              folder_name=args.folder_name,
                              index=batch_index)
 
-        if batch_index > 200:
+        if batch_index > 10:
             break
